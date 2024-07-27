@@ -1,29 +1,56 @@
-// pages/api/insert-recipe.ts
-
-import { NextApiRequest, NextApiResponse } from "next";
+import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-const supabase = createClient(supabaseUrl, supabaseKey);
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method === "POST") {
-    const { name, ingredients, instructions, rating, difficulty, image_url, calories, cuisine, time } = req.body;
+export async function POST(request: NextRequest) {
+  try {
+    const {
+      name,
+      ingredients,
+      instructions,
+      rating,
+      difficulty,
+      image_url,
+      calories,
+      cuisine,
+      time,
+    } = await request.json();
 
     const { data, error } = await supabase
       .from("recipes")
-      .insert([{ name, ingredients, instructions, rating, difficulty, image_url, calories, cuisine, time }])
-      .select();
+      .insert([
+        {
+          name,
+          ingredients,
+          instructions,
+          rating,
+          difficulty,
+          image_url,
+          calories,
+          cuisine,
+          time,
+        },
+      ]);
 
-    if (error) {
-      console.error("Error inserting recipe:", error);
-      return res.status(500).json({ error: error.message });
-    }
+    if (error) throw error;
 
-    return res.status(200).json(data);
-  } else {
-    res.setHeader("Allow", ["POST"]);
-    res.status(405).end(`Method ${req.method} Not Allowed`);
+    return NextResponse.json(data, { status: 200 });
+  } catch (error) {
+    console.error("Error inserting recipe:", error);
+    return NextResponse.json(
+      { error: "Failed to insert recipe" },
+      { status: 500 }
+    );
   }
+}
+
+export function GET() {
+  return NextResponse.json(
+    { message: "Method GET Not Allowed" },
+    { status: 405 }
+  );
 }
