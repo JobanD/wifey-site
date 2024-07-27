@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 import { useToast } from "@/components/ui/use-toast";
+import { useSudokuTimer } from "@/utils/hooks/useSudokuTimer";
 
 type SudokuCell = number | null;
 type SudokuGrid = SudokuCell[][];
@@ -26,44 +27,21 @@ export default function SudokuGame() {
     null
   );
   const [mistakes, setMistakes] = useState(0);
-  const [startTime, setStartTime] = useState<Date | null>(null);
-  const [endTime, setEndTime] = useState<Date | null>(null);
-  const [timer, setTimer] = useState(() => {
-    const savedTimer = localStorage.getItem("sudokuTimer");
-    return savedTimer ? parseInt(savedTimer, 10) : 0;
-  });
   const [numberCounts, setNumberCounts] = useState<number[]>(Array(10).fill(0));
   const [completedNumbers, setCompletedNumbers] = useState<boolean[]>(
     Array(10).fill(false)
   );
   const [showCongratulations, setShowCongratulations] = useState(false);
-  const [timerIntervalId, setTimerIntervalId] = useState<NodeJS.Timeout | null>(
-    null
-  );
+
   const supabase = createClientComponentClient();
   const { toast } = useToast();
   const router = useRouter();
+  const gameOver = showCongratulations || mistakes >= 3;
+  const timer = useSudokuTimer(gameOver);
 
   useEffect(() => {
     fetchTodaysPuzzle();
-    if (timerIntervalId) clearInterval(timerIntervalId);
-    const timerInterval = setInterval(() => {
-      setTimer((prev) => {
-        const newTimer = prev + 1;
-        localStorage.setItem("sudokuTimer", newTimer.toString());
-        return newTimer;
-      });
-    }, 1000);
-    setTimerIntervalId(timerInterval);
-    return () => clearInterval(timerInterval);
   }, []);
-
-  useEffect(() => {
-    if (showCongratulations) {
-      if (timerIntervalId) clearInterval(timerIntervalId);
-      localStorage.removeItem("sudokuTimer");
-    }
-  }, [showCongratulations, timerIntervalId]);
 
   async function fetchTodaysPuzzle() {
     const today = new Date().toISOString().split("T")[0];
@@ -86,7 +64,6 @@ export default function SudokuGame() {
     const puzzleData = data as SudokuPuzzle;
     setPuzzle(stringToGrid(puzzleData.puzzle));
     setSolution(stringToGrid(puzzleData.solution));
-    setStartTime(new Date());
     updateNumberCounts(stringToGrid(puzzleData.puzzle));
   }
 
@@ -134,11 +111,7 @@ export default function SudokuGame() {
       updateNumberCounts(newPuzzle);
 
       if (isPuzzleComplete(newPuzzle)) {
-        setEndTime(new Date());
         setShowCongratulations(true);
-        if (timerIntervalId) clearInterval(timerIntervalId); // Clear the interval
-        console.log("Removing timer from localStorage"); // Debug log
-        localStorage.removeItem("sudokuTimer"); // Clear the timer from localStorage
         saveScore();
       }
     } else {
@@ -156,8 +129,6 @@ export default function SudokuGame() {
           variant: "destructive",
         });
         setTimeout(() => {
-          console.log("Removing timer from localStorage"); // Debug log
-          localStorage.removeItem("sudokuTimer"); // Clear the timer from localStorage
           router.push("/games");
         }, 3000);
       }
@@ -174,21 +145,12 @@ export default function SudokuGame() {
   }
 
   async function saveScore() {
-    console.log("saveScore function called");
-    if (!startTime) {
-      console.log("startTime is null", { startTime });
-      return;
-    }
-
-    console.log("Timer value:", timer);
-
     const {
       data: { user },
       error: userError,
     } = await supabase.auth.getUser();
 
     if (userError || !user) {
-      console.error("Error getting user:", userError);
       toast({
         title: "Error",
         description: "Unable to save score. Please log in.",
@@ -197,11 +159,8 @@ export default function SudokuGame() {
       return;
     }
 
-    console.log("User retrieved:", user.id);
-
     const today = new Date().toISOString().split("T")[0];
 
-    // Check if an entry already exists for this user and date
     const { data: existingScore, error: existingScoreError } = await supabase
       .from("sudoku_scores")
       .select("*")
@@ -210,7 +169,6 @@ export default function SudokuGame() {
       .single();
 
     if (existingScoreError && existingScoreError.code !== "PGRST116") {
-      console.error("Error checking existing score:", existingScoreError);
       toast({
         title: "Error",
         description: "Failed to check existing score. Please try again.",
@@ -220,7 +178,6 @@ export default function SudokuGame() {
     }
 
     if (existingScore) {
-      console.log("Score already exists for today:", existingScore);
       toast({
         title: "Info",
         description: "You've already submitted a score for today's puzzle.",
@@ -233,24 +190,20 @@ export default function SudokuGame() {
       user_id: user.id,
       puzzle_date: today,
       time_seconds: timer,
-      mistakes: mistakes, // Assuming you have a 'mistakes' state variable
+      mistakes: mistakes,
     };
-
-    console.log("Attempting to insert score:", scoreData);
 
     const { data, error } = await supabase
       .from("sudoku_scores")
       .insert(scoreData);
 
     if (error) {
-      console.error("Error saving score:", error);
       toast({
         title: "Error",
         description: "Failed to save your score. Please try again.",
         variant: "destructive",
       });
     } else {
-      console.log("Score saved successfully:", data);
       toast({
         title: "Success",
         description: "Your score has been saved!",
@@ -262,7 +215,6 @@ export default function SudokuGame() {
   function fillPuzzleWithSolution() {
     setPuzzle(solution);
     setShowCongratulations(true);
-    if (timerIntervalId) clearInterval(timerIntervalId); // Clear the interval
   }
 
   return (

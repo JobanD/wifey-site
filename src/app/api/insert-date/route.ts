@@ -1,14 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+import { createClient } from "@/utils/supabase/server";
 
 export async function POST(request: NextRequest) {
   try {
     const dateIdea = await request.json();
+
+    const supabase = createClient();
 
     const { data, error } = await supabase
       .from("date_ideas")
@@ -27,4 +24,11 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
+}
+
+export function GET() {
+  return NextResponse.json(
+    { message: "Method GET Not Allowed" },
+    { status: 405 }
+  );
 }

@@ -1,14 +1,15 @@
+// useSudokuTimer.ts
 "use client";
 
 import { useState, useEffect } from "react";
 
-export function useTimer(gameOver: boolean) {
+export function useSudokuTimer(gameOver: boolean) {
   const [timer, setTimer] = useState(0);
 
   useEffect(() => {
     if (typeof window === "undefined") return; // Guard for server-side rendering
 
-    const savedTimer = localStorage.getItem("wordleTimer");
+    const savedTimer = localStorage.getItem("sudokuTimer");
     if (savedTimer) {
       setTimer(parseInt(savedTimer, 10));
     }
@@ -19,7 +20,7 @@ export function useTimer(gameOver: boolean) {
       timerInterval = setInterval(() => {
         setTimer((prev) => {
           const newTimer = prev + 1;
-          localStorage.setItem("wordleTimer", newTimer.toString());
+          localStorage.setItem("sudokuTimer", newTimer.toString());
           return newTimer;
         });
       }, 1000);
@@ -27,7 +28,7 @@ export function useTimer(gameOver: boolean) {
 
     return () => {
       if (timerInterval) clearInterval(timerInterval);
-      if (gameOver) localStorage.removeItem("wordleTimer");
+      if (gameOver) localStorage.removeItem("sudokuTimer");
     };
   }, [gameOver]);
 
